@@ -1,10 +1,12 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
-import type { UploadFile, UploadProps } from 'antd'
+import type { UploadProps } from 'antd'
 import http from './http'
 import { notify } from './utils/notify'
 import { shouldUseChunkUpload, uploadFileWithChunks, uploadSingleFile } from './upload/chunkUpload'
 import { postFormData } from './upload/postFormData'
 import { useUpload } from './hooks/useUpload'
+import { useStepFlow } from './hooks/useStepFlow'
+import { useDormFileState } from './hooks/useDormFileState'
 import type {
   ClassRosterResponse,
   ScoreStats,
@@ -22,32 +24,20 @@ const Step5 = lazy(() => import('./steps/Step5'))
 const stepItems = ['智育', '奖励', '体育', '德育', '劳育', '汇总导出']
 
 const App = () => {
-  const [step, setStep] = useState(0)
+  const { step, stepReady, nextStep, prevStep, markStepReady } = useStepFlow(5, 5)
   const [className, setClassName] = useState('')
   const [students, setStudents] = useState<StudentSummary[]>([])
   const [lastMessage, setLastMessage] = useState('')
-  const [stepReady, setStepReady] = useState<boolean[]>([false, false, false, false, false])
-
-  const [dormStudentFile, setDormStudentFile] = useState<File | null>(null)
-  const [dormStarFile, setDormStarFile] = useState<File | null>(null)
-  const [dormStudentFileList, setDormStudentFileList] = useState<UploadFile[]>([])
-  const [dormStarFileList, setDormStarFileList] = useState<UploadFile[]>([])
-
-  const nextStep = () => {
-    setStep((prev) => (prev < 5 ? prev + 1 : prev))
-  }
-
-  const prevStep = () => {
-    setStep((prev) => (prev > 0 ? prev - 1 : prev))
-  }
-
-  const markStepReady = (index: number) => {
-    setStepReady((prev) => {
-      const next = [...prev]
-      next[index] = true
-      return next
-    })
-  }
+  const {
+    dormStudentFile,
+    dormStarFile,
+    dormStudentFileList,
+    dormStarFileList,
+    onSelectDormStudentFile,
+    onSelectDormStarFile,
+    onClearDormStudentFile,
+    onClearDormStarFile
+  } = useDormFileState()
 
   const handleCommonUploadApplied = useCallback(
     (payload: UploadApplyResult, msg: string, stepIndex: number) => {
@@ -55,7 +45,7 @@ const App = () => {
       setLastMessage(msg)
       markStepReady(stepIndex)
     },
-    []
+    [markStepReady]
   )
 
   const { commonUpload } = useUpload({ onApplied: handleCommonUploadApplied })
@@ -142,28 +132,6 @@ const App = () => {
 
   const onUploadMoral: UploadProps['customRequest'] = async (options) => {
     await commonUpload('/api/import/moral', options, 3, '德育')
-  }
-
-  const onSelectDormStudentFile = (file: UploadFile) => {
-    const raw = (file.originFileObj as File | undefined) ?? (file as unknown as File)
-    setDormStudentFile(raw)
-    setDormStudentFileList([file])
-  }
-
-  const onSelectDormStarFile = (file: UploadFile) => {
-    const raw = (file.originFileObj as File | undefined) ?? (file as unknown as File)
-    setDormStarFile(raw)
-    setDormStarFileList([file])
-  }
-
-  const onClearDormStudentFile = () => {
-    setDormStudentFile(null)
-    setDormStudentFileList([])
-  }
-
-  const onClearDormStarFile = () => {
-    setDormStarFile(null)
-    setDormStarFileList([])
   }
 
   const uploadDorm = async () => {
